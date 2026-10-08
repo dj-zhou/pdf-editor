@@ -11,9 +11,11 @@
   "scripts": {
     "build": "node scripts/build.mjs",
     "start": "node scripts/serve.mjs",
-    "test": "node --test tests/*.mjs"
+    "test": "node --test tests/*.mjs",
+    "deploy": "npm run build && wrangler deploy"
   },
   "devDependencies": {
-    "pdf-lib": "1.17.1"
+    "pdf-lib": "1.17.1",
+    "wrangler": "4.105.0"
   }
 }

@@ -12,6 +12,6 @@ if (target === sourceRoot || sourceRoot.startsWith(target + path.sep) ||
 }
 await rm(target, { recursive: true, force: true });
 await mkdir(target, { recursive: true });
-for (const name of ["index.html", "i18n.mjs", "embed.mjs", "styles", "locales", "pdf-tools", "vendor", "LICENSE", "THIRD_PARTY_NOTICES.md"])
+for (const name of ["index.html", "_headers", "i18n.mjs", "embed.mjs", "styles", "locales", "pdf-tools", "vendor", "LICENSE", "THIRD_PARTY_NOTICES.md"])
     await cp(path.join(root, name), path.join(target, name), { recursive: true });
 console.log(`Standalone PDF editor built in ${target}`);

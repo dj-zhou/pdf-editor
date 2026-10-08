@@ -8,13 +8,17 @@ if (params.get("embed") === "1" && parent !== window) {
     try { parentOrigin = new URL(document.referrer).origin; } catch {}
     if (parentOrigin) {
         let previousHeight = 0;
-        const observer = new ResizeObserver(() => {
+        const reportHeight = () => {
             const height = Math.ceil(document.body.getBoundingClientRect().height);
             if (height !== previousHeight) {
                 previousHeight = height;
                 parent.postMessage({ type: "pdf-editor:height", height }, parentOrigin);
             }
-        });
+        };
+        const observer = new ResizeObserver(reportHeight);
         observer.observe(document.body);
+        // Cross-origin frames hidden during loading may not receive an initial
+        // ResizeObserver callback in Chrome. Measure now to unblock the host.
+        reportHeight();
     }
 }

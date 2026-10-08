@@ -1,6 +1,9 @@
 node_modules/
 dist/
-.DS_Store
+.git/
 .env*
+.DS_Store
+tests/
+docs/
 .wrangler/
 .dev.vars*

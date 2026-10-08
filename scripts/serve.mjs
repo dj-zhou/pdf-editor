@@ -6,6 +6,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 const root = fileURLToPath(new URL("../dist/", import.meta.url));
 const port = Number(process.env.PORT || 8011);
+const host = process.env.HOST || "127.0.0.1";
 const mime = { ".html": "text/html; charset=utf-8", ".js": "text/javascript", ".mjs": "text/javascript", ".css": "text/css", ".wasm": "application/wasm", ".json": "application/json" };
 http.createServer(async (req, res) => {
     try {
@@ -16,4 +17,4 @@ http.createServer(async (req, res) => {
         res.writeHead(200, { "Content-Type": mime[path.extname(filename)] || "text/plain; charset=utf-8", "Cache-Control": "no-cache" });
         res.end(bytes);
     } catch { res.writeHead(404); res.end("Not found"); }
-}).listen(port, "127.0.0.1", () => console.log(`PDF editor: http://127.0.0.1:${port}/`));
+}).listen(port, host, () => console.log(`PDF editor: http://127.0.0.1:${port}/`));

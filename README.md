@@ -6,7 +6,7 @@ The engine is **MuPDF.js 1.28.1 / WebAssembly**, not Python PyMuPDF. No Python s
 
 ## Run
 
-Requires Node.js 18 or newer. Runtime engine files are pinned in vendor/mupdf/1.28.1; npm installs only the development test dependency.
+Requires Node.js 22 or newer for development and deployment. Runtime engine files are pinned in vendor/mupdf/1.28.1; npm installs development and deployment tools only.
 
 ```sh
 npm ci
@@ -18,6 +18,45 @@ npm start
 Open http://127.0.0.1:8011/. Use `?lang=es`, `?lang=zh-CN`, etc. to choose a locale. Run the optional browser scripts with an existing Playwright installation configured via PLAYWRIGHT_MODULE and PLAYWRIGHT_EXECUTABLE.
 
 Deploy the contents of `dist/` to a static host. Serve `.wasm` as `application/wasm` and `.mjs` as JavaScript. Allow this application to be framed by the Ship Toolkit host; do not set `X-Frame-Options: DENY` or an incompatible `frame-ancestors` policy. HTTPS is required for production.
+
+## Local Docker preview
+
+```sh
+docker build -t pdf-editor .
+docker run --rm -p 127.0.0.1:8011:8011 pdf-editor
+```
+
+Ship Toolkit's `scripts/serve-in-local-containers.sh` builds a separate editor
+container directly from the public GitHub repository when using the default local
+editor URL. It resolves `master` to a commit on each startup; set `PDF_EDITOR_REF`
+to a branch, tag or full commit SHA to choose another version. Local uncommitted
+changes in this checkout are not included in that GitHub-based preview.
+
+Pushing this repository to GitHub does not start a server. Local use requires
+`npm start` or the Docker preview; public use requires deploying `dist/` to an
+HTTPS static host and configuring Ship Toolkit's `PDF_EDITOR_URL` with that URL.
+
+## Cloudflare deployment from GitHub
+
+Push the deployment configuration and desired editor changes to this repository.
+Create a separate Cloudflare Worker connected to `dj-zhou/pdf-editor`:
+
+- Worker name: `pdf-editor` (matching `wrangler.jsonc`).
+- Production branch: `master`.
+- Root directory: repository root.
+- Build command: `npm run build`.
+- Deploy command: `npx wrangler deploy`.
+
+Cloudflare installs dependencies from `package-lock.json`, builds this repository,
+and serves `dist/` at the editor's own HTTPS URL. Set Ship Toolkit's build variable
+`PDF_EDITOR_URL` to that actual deployed URL. Deploy Ship Toolkit after the editor.
+Subsequent editor commits deploy through its own Git integration, independently
+of Ship Toolkit. No editor source or engine is copied into the Ship Toolkit build.
+
+For a manual deployment after configuring Cloudflare authentication, run
+`npm ci` followed by `npm run deploy`. Local builds do not deploy anything.
+
+[Cloudflare Git builds documentation](https://developers.cloudflare.com/workers/ci-cd/builds/)
 
 ## Ship Toolkit integration
 

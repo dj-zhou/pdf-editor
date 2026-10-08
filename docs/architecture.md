@@ -65,9 +65,11 @@ cross-reference table without deduplicating. Regression tests
 reopen exported documents to check that replacement text survives the save.
 
 The pinned 9.9 MB WASM library and JavaScript are served from
-`vendor/mupdf/1.28.1/`, and are copied into the existing Cloudflare static build and
-local Docker build. There is no server runtime dependency, new exposed port, or
-deployment configuration to provision. Run the existing build/deployment process.
+`vendor/mupdf/1.28.1/`, and are copied into this repository's standalone static build. Ship Toolkit's
+local preview builds this public repository directly from GitHub in a separate
+container on port 8011. Production uses a separate Cloudflare static assets Worker
+connected to this repository; Ship Toolkit embeds its HTTPS URL. No engine assets
+are copied into the Ship Toolkit source tree or deployment image.
 
 ## Deployment
 
