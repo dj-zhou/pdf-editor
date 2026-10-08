@@ -1,0 +1,26 @@
+/* Override these values after importing this file to theme another project. */
+:root {
+  --color-primary: #ffb612;
+  --color-primary-bright: #ffc72c;
+  --color-primary-dark: #8a5900;
+  --color-primary-soft: #fff0b8;
+  --color-primary-wash: #fff9e8;
+  --color-ink: #101820;
+  --color-muted: #686052;
+  --color-line: #ead79d;
+  --color-page: #fffaf0;
+  --color-surface: #ffffff;
+  --font-family-base:
+    Inter, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --shadow-low:
+    0 1px 2px rgb(86 57 0 / 8%),
+    0 8px 22px rgb(122 80 0 / 9%);
+  --shadow-raised:
+    0 3px 6px rgb(86 57 0 / 10%),
+    0 14px 32px rgb(122 80 0 / 15%);
+  --radius-card: 28px;
+  --radius-control: 18px;
+  --transition: 180ms cubic-bezier(0.2, 0, 0, 1);
+  color-scheme: light;
+  font-family: var(--font-family-base);
+}

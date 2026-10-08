@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Edit existing PDF text, find and replace across pages, and download the edited PDF.">
+    <title>Edit PDF Text</title>
+    <link rel="stylesheet" href="./styles/material-tokens.css">
+    <link rel="stylesheet" href="./styles/controls.css">
+    <link rel="stylesheet" href="./styles/editor-page.css">
+    <link rel="stylesheet" href="./pdf-tools/edit-text/edit-text.css">
+</head>
+<body>
+    <header class="editor-heading">
+        <h1>Edit PDF Text</h1>
+        <p>Open a PDF, click the text to edit it, then download your edited file.</p>
+    </header>
+    <main class="text-editor">
+        <section aria-label="PDF text editor" id="text-editor">
+            <div class="text-editor-toolbar">
+                <button class="button button--filled" id="open" type="button">Open PDF</button>
+                <input class="sr-only" id="file" type="file" accept="application/pdf,.pdf">
+                <button class="button button--outlined" id="undo" disabled>Undo</button>
+                <button class="button button--outlined" id="reset" disabled>Reset edits</button>
+                <button class="button button--filled" id="download" data-loaded disabled>Download PDF</button>
+                <div class="text-editor-pages">
+                    <div class="text-editor-pagination">
+                        <button class="button button--outlined button--compact" id="prev" data-loaded disabled aria-label="Previous page">Previous</button>
+                        <label>Page <input id="page" data-loaded disabled type="number" min="1" value="1" aria-label="Page number"></label>
+                        <span id="page-count">of 0</span>
+                        <button class="button button--outlined button--compact" id="next" data-loaded disabled aria-label="Next page">Next</button>
+                    </div>
+                    <label class="text-editor-zoom">Zoom <select id="zoom" data-loaded disabled>
+                        <option value="fit">Fit width</option><option value="0.75">75%</option>
+                        <option value="1">100%</option><option value="1.5">150%</option><option value="2">200%</option>
+                    </select></label>
+                </div>
+                <div class="text-editor-toolbar-options">
+                    <label><input id="fit" type="checkbox" data-loaded disabled>Auto-shrink long text</label>
+                    <label><input id="cover" type="checkbox" data-loaded disabled>Cover image background</label>
+                </div>
+            </div>
+            <div class="text-editor-layout">
+                <div class="text-editor-view">
+                    <div class="text-editor-viewport" id="viewport">
+                        <div class="text-editor-empty" id="empty">
+                            <label class="pdf-drop-zone" for="file">
+                                <strong>Choose a PDF file</strong>
+                                <span>or drag and drop it here</span>
+                            </label>
+                        </div>
+                        <div class="text-editor-paper" id="paper" hidden>
+                            <canvas id="canvas" aria-label="PDF page preview"></canvas>
+                            <div class="text-editor-boxes" id="boxes" aria-label="Editable text"></div>
+                            <form class="text-editor-inline" id="inline-editor" hidden aria-label="Edit PDF text in place">
+                                <textarea id="inline-text" aria-label="Edit text in place" aria-describedby="inline-instructions"
+                                    rows="1" spellcheck="false" maxlength="20000" wrap="off"></textarea>
+                                <div id="inline-caret-layer" aria-hidden="true"></div>
+                                <div class="text-editor-inline-actions">
+                                    <button id="inline-save" type="submit">Save text</button>
+                                    <button id="inline-cancel" type="button">Cancel editing</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+                <aside class="text-editor-sidebar">
+                    <div class="text-editor-instructions">
+                        <h2>Edit on the page</h2>
+                        <p id="inline-instructions">Click text and type directly on the PDF. Enter saves a line; Escape cancels.</p>
+                        <p>Click outside the text to save. Delete all its characters to remove it.</p>
+                        <p>Background coverage paints a sampled solid color over the text box. Review patterned backgrounds carefully.</p>
+                    </div>
+                    <section class="text-editor-find" aria-labelledby="find-title">
+                        <h2 id="find-title">Find and replace</h2>
+                        <form id="find-form">
+                            <label class="field text-editor-find-row"><span class="field__label">Find</span><input id="find" type="text" required data-loaded disabled></label>
+                            <label class="field text-editor-find-row"><span class="field__label">Replace with</span><input id="replace-with" type="text" data-loaded disabled></label>
+                            <label class="field text-editor-find-row"><span class="field__label">Pages</span><input id="range" type="text" placeholder="All pages; e.g. 1-3, 5, 8-" data-loaded disabled></label>
+                            <label class="text-editor-check"><input id="case" type="checkbox" data-loaded disabled>Case sensitive</label>
+                            <label class="text-editor-check"><input id="regex" type="checkbox" data-loaded disabled>Regular expression</label>
+                            <button class="button button--filled" data-loaded disabled>Replace all</button>
+                        </form>
+                    </section>
+                </aside>
+            </div>
+        </section>
+        <dialog class="text-editor-open-dialog" id="open-dialog" aria-labelledby="open-dialog-title" aria-describedby="open-dialog-message">
+            <form method="dialog">
+                <h2 id="open-dialog-title">Open PDF</h2>
+                <p id="open-dialog-message">Opening another PDF will discard your current edits. Continue?</p>
+                <div class="text-editor-open-dialog-actions">
+                    <button class="button button--outlined button--compact" id="open-dialog-cancel" value="cancel" type="submit" autofocus>Cancel</button>
+                    <button class="button button--filled button--compact" id="open-dialog-confirm" value="open" type="submit">Open PDF</button>
+                </div>
+            </form>
+        </dialog>
+        <section class="pdf-tool-guide text-editor-help" aria-labelledby="how-edit-pdf-text">
+            <div class="pdf-tool-section-heading">
+                <h2 id="how-edit-pdf-text">How to edit PDF text</h2>
+            </div>
+            <ol class="pdf-tool-steps">
+                <li>
+                    <div>
+                        <h3>Open your PDF</h3>
+                        <p>Open a PDF.</p>
+                    </div>
+                </li>
+                <li>
+                    <div>
+                        <h3>Edit text</h3>
+                        <p>Click text on the PDF and type directly in its position. Press Enter or click outside to save; press Escape to cancel.</p>
+                    </div>
+                </li>
+                <li>
+                    <div>
+                        <h3>Download PDF</h3>
+                        <p>Review the preview and download the edited PDF.</p>
+                    </div>
+                </li>
+            </ol>
+            <div class="text-editor-help-notes">
+                <p>Existing text is removed and the replacement is written as searchable text. Images and vector graphics are preserved. New characters may use a different font; exact font matching is not always possible.</p>
+                <p>Scanned pages need OCR before their text can be edited. Vertical, angled, and right-to-left text are not supported. Changing PDFs invalidates digital signatures.</p>
+            </div>
+        </section>
+    </main>
+    <footer class="source-notice">
+        <a href="https://github.com/dj-zhou/pdf-editor" target="_blank" rel="noopener noreferrer">Source code</a>
+        <span> · MuPDF.js · </span><a href="./LICENSE" target="_blank" rel="noopener noreferrer">AGPL-3.0-or-later</a>
+    </footer>
+    <script type="module" src="./embed.mjs"></script>
+    <script type="module" src="./pdf-tools/edit-text/edit-text.js"></script>
+</body>
+</html>
