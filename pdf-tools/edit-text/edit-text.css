@@ -3,7 +3,8 @@
 .text-editor-toolbar .button { min-height: 36px; padding: 0 10px; font-size: 13px; }
 .text-editor-toolbar > .button { font-size: 16px; }
 .text-editor-toolbar .button--filled { border: 2px solid transparent; }
-.text-editor-toolbar .button--filled:disabled { background: #e8edf2; color: #68717c; border-color: #c1c9d2; box-shadow: none; opacity: 1; }
+.text-editor-toolbar .button:disabled,
+.text-editor-find .button:disabled { color: var(--color-primary-dark); background: #fffdf7; border: 2px solid #c7a749; box-shadow: none; }
 .text-editor-toolbar-options { display: flex; flex-direction: column; gap: 4px; margin-left: auto; font-size: 13px; line-height: 1.35; }
 .text-editor-toolbar-options label { display: flex; align-items: center; gap: 6px; }
 .text-editor input, .text-editor select, .text-editor textarea { font: inherit; padding: 8px; border: 1px solid #c1c9d2; border-radius: 6px; max-width: 100%; }
@@ -13,7 +14,8 @@
 .text-editor-pages { display: flex; justify-content: flex-start; align-items: center; flex-wrap: wrap; gap: 6px 16px; max-width: 100%; margin-left: auto; }
 .text-editor-pagination { display: flex; align-items: center; gap: 6px; font-size: 16px; font-weight: 600; white-space: nowrap; }
 .text-editor-pagination label, .text-editor-zoom { display: flex; align-items: center; gap: 6px; }
-.text-editor-pages .button--compact { padding: 0 10px; font-size: 13px; }
+.text-editor-pagination .button--compact { display: grid; place-items: center; flex: 0 0 36px; width: 36px; min-width: 36px; padding: 3px 5px; border-radius: 8px; }
+.text-editor-pagination .button--compact svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
 .text-editor-pages input { box-sizing: border-box; width: 44px; height: 36px; padding: 2px 4px; border-color: #c7a749; border-radius: 10px; background: #fffdf7; color: var(--color-ink); text-align: center; }
 .text-editor-zoom { color: var(--color-primary-dark); font-size: 13px; font-weight: 600; }
 .text-editor-pages select {
@@ -77,7 +79,6 @@
 }
 .text-editor-sidebar .text-editor-find-row input:focus { background: var(--color-primary-soft); border-bottom-color: var(--color-primary); }
 .text-editor-find input[type=checkbox] { accent-color: var(--color-primary-dark); }
-.text-editor-find .button:disabled { color: #68717c; background: #e8edf2; border: 1px solid #c1c9d2; box-shadow: none; opacity: 1; }
 .text-editor-help { margin-top: 24px; }
 .text-editor-help-notes { display: grid; gap: 12px; margin-top: 24px; }
 .text-editor-help-notes p { margin: 0; color: var(--color-muted); font-size: 0.92rem; }
@@ -93,11 +94,4 @@
     .text-editor-layout { grid-template-columns: 1fr; }
     .text-editor-viewport { height: 58vh; padding: 12px; }
     .text-editor-sidebar { border-top: 1px solid var(--color-line); }
-}
-@media (max-width: 500px) {
-    /* Localized Previous/Next labels can be long. Their translated accessible
-       names remain intact while compact arrows leave room for the page count. */
-    .text-editor-pages .button--compact { min-width: 32px; padding: 0 8px; font-size: 0; }
-    .text-editor-pages #prev::before { content: "‹"; font-size: 24px; line-height: 1; }
-    .text-editor-pages #next::before { content: "›"; font-size: 24px; line-height: 1; }
 }

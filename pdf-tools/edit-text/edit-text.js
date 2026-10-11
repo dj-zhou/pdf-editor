@@ -209,7 +209,7 @@ async function render(nextEdits = edits, nextPage = page, includeDraft = true) {
             width: `${Math.max(3, rect[2] - rect[0]) * cssScale}px`, height: `${(rect[3] - rect[1]) * cssScale}px` });
         button.addEventListener("click", event => selectUnit(unit, { x: event.clientX, y: event.clientY })); boxes.append(button);
     }
-    $("page").value = page + 1; $("page").max = count;
+    $("page").value = page + 1;
     $("page-count").textContent = t("of {count}", { count });
     $("paper").hidden = false; $("empty").hidden = true;
     if (selected) { selected.layout = units.find(unit => unit.id === selected.id).layout; positionInlineEditor(); }
@@ -370,6 +370,7 @@ async function goTo(index) {
 }
 $("prev").addEventListener("click", () => goTo(page - 1));
 $("next").addEventListener("click", () => goTo(page + 1));
+for (const event of ["focus", "click"]) $("page").addEventListener(event, () => $("page").select());
 $("page").addEventListener("change", () => goTo(Number($("page").value) - 1));
 for (const id of ["zoom", "fit", "cover"]) $(id).addEventListener("change", () => operation(async () => {
     clearSelection(); await render();

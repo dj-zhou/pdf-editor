@@ -190,7 +190,7 @@ try {
     await page.locator("#next").click(); await idle();
     await page.locator("#find").fill("Original");
     await page.locator("#replace-with").fill("Changed");
-    await page.getByRole("button", { name: "Replace all", exact: true }).click();
+    await page.getByRole("button", { name: "Replace All", exact: true }).click();
     await idle(); await editsPresent(true);
 
     // Export must include the draft even when Enter has not been pressed.
