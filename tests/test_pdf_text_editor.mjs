@@ -4,6 +4,7 @@ import { readFile } from "node:fs/promises";
 import { PDFDocument, StandardFonts, rgb, degrees } from "pdf-lib";
 import mupdf from "../vendor/mupdf/1.28.1/mupdf.js";
 import { openPdf, readUnits, publicUnit, applyEdits, styledReplacement, parsePageRange, replacementFunction } from "../pdf-tools/edit-text/pdf-text-editor.mjs";
+import { BUNDLED_FONTS, fontVariants, fontVariant } from "../pdf-tools/edit-text/font-catalog.mjs";
 
 async function fixture({ crop = false, rotated = false } = {}) {
     const doc = await PDFDocument.create(), regular = await doc.embedFont(StandardFonts.Helvetica);
@@ -39,6 +40,164 @@ function save(result) {
     try { return buffer.asUint8Array().slice(); }
     finally { buffer.destroy(); result.doc.destroy(); }
 }
+
+test("moving text exports translated glyphs and caret geometry while preserving the original surroundings", async () => {
+    for (const crop of [false, true]) for (const cover of [false, true]) {
+        const source = await fixture({ crop });
+        const original = inspect(source);
+        for (const value of ["Original text", "A longer replacement", "First row\nSecond row"]) {
+            const edit = { page: 0, id: 0, value };
+            const baseline = applyEdits(source, [edit], { cover });
+            const offset = [-15, 75];
+            const moved = applyEdits(source, [{ ...edit, offset }], { cover });
+            const before = baseline.editLayouts[0].layout, after = moved.editLayouts[0].layout;
+            for (let i = 0; i < 4; i++) assert.ok(Math.abs(after.bounds[i] - before.bounds[i] - offset[i % 2]) < 0.001);
+            for (let i = 0; i < before.stops.length; i++) {
+                assert.ok(Math.abs(after.stops[i].x - before.stops[i].x - offset[0]) < 0.001);
+                assert.ok(Math.abs(after.stops[i].baseline - before.stops[i].baseline - offset[1]) < 0.001);
+            }
+            const baselinePages = inspect(save(baseline)), pages = inspect(save(moved));
+            const replacement = pages[0].units.find(u => u.text === value.split("\n")[0]);
+            const atSource = baselinePages[0].units.find(u => u.text === value.split("\n")[0]);
+            assert.ok(Math.abs(replacement.origin[0] - atSource.origin[0] - offset[0]) < 0.01);
+            assert.ok(Math.abs(replacement.origin[1] - atSource.origin[1] - offset[1]) < 0.01);
+            const neighbor = pages[0].units.find(u => u.text === "Keep this line"), originalNeighbor = original[0].units.find(u => u.text === "Keep this line");
+            assert.deepEqual(neighbor.origin, originalNeighbor.origin);
+            assert.deepEqual(neighbor.bbox, originalNeighbor.bbox);
+            assert.equal(pages[0].units.filter(u => u.text === value.split("\n")[0]).length, 1);
+            assert.deepEqual(pages[1], original[1]);
+        }
+    }
+});
+
+test("rejects invalid text movement coordinates", async () => {
+    const source = await fixture();
+    for (const offset of [[NaN, 0], [0, Infinity], [1], [1, 2, 3], "10,20", null])
+        assert.throws(() => applyEdits(source, [{ page: 0, id: 0, value: "Moved", offset }]), /position/);
+});
+
+function characters(bytes) {
+    const doc = openPdf(bytes), page = doc.loadPage(0), text = page.toStructuredText(), result = [];
+    try {
+        text.walk({ onChar(c, origin, font, size, quad, color) {
+            result.push({ c, origin, size, color, name: font.getName(), bold: font.isBold(), italic: font.isItalic() });
+            font.destroy();
+        } });
+        return result;
+    } finally { text.destroy(); page.destroy(); doc.destroy(); }
+}
+
+test("whole-string formatting exports size, font variants, and color even with auto-shrink enabled", async () => {
+    const source = await fixture();
+    for (const [font, expected] of [["sans", /Helvetica|NimbusSans/], ["serif", /Times|NimbusRoman/], ["mono", /Courier|NimbusMono/]]) {
+        const output = save(applyEdits(source, [{ page: 0, id: 0, value: "Formatted string", offset: [5, 70],
+            format: { font, size: 24, bold: true, italic: true, color: "#336699" } }], { fit: true }));
+        const chars = characters(output).filter(char => char.origin[1] > 195 && char.origin[1] < 205);
+        assert.equal(chars.map(char => char.c).join(""), "Formatted string");
+        for (const char of chars) {
+            assert.ok(Math.abs(char.size - 24) < 0.01, "explicit size must override auto-shrink");
+            assert.match(char.name, expected);
+            assert.equal(char.bold, true); assert.equal(char.italic, true);
+            char.color.forEach((v, i) => assert.ok(Math.abs(v - [0.2, 0.4, 0.6][i]) < 0.01));
+        }
+        assert.ok(Math.abs(chars[0].origin[0] - 45) < 0.01);
+        assert.match(inspect(output)[0].text, /Keep this line/);
+    }
+});
+
+test("bundled font families embed their supported styles with matching caret geometry", async () => {
+    const source = await fixture(), bundledFonts = {};
+    for (const [family, info] of Object.entries(BUNDLED_FONTS)) for (const variant of fontVariants(family))
+        bundledFonts[`${family}:${variant}`] = new Uint8Array(await readFile(new URL(`../vendor/fonts/${info.file}-${variant}.ttf`, import.meta.url)));
+    for (const [family, info] of Object.entries(BUNDLED_FONTS)) for (const [bold, italic] of [[false, false], [true, false], [false, true], [true, true]]) {
+        const result = applyEdits(source, [{ page: 0, id: 0, value: "Font sample", format: { font: family, size: 18, bold, italic } }], { bundledFonts });
+        const layout = result.editLayouts[0].layout;
+        const output = save(result), chars = characters(output).filter(char => Math.abs(char.origin[1] - 130) < 0.01);
+        assert.equal(chars.map(char => char.c).join(""), "Font sample");
+        for (const char of chars) {
+            assert.ok(char.name.replace(/\s/g, "").includes(info.name.replace(/\s/g, "")), `${family}: expected ${info.name}, got ${char.name}`);
+            assert.equal(char.bold, bold && fontVariants(family).includes("Bold"), `${family}: ${fontVariant(bold, italic)}`);
+            assert.equal(char.italic, italic && fontVariants(family).includes("Italic"), `${family}: ${fontVariant(bold, italic)}`);
+            assert.ok(Math.abs(char.size - 18) < 0.01);
+            if (!/\s/.test(char.c)) assert.ok(layout.stops.some(stop => Math.abs(stop.x - char.origin[0]) < 0.01 && Math.abs(stop.baseline - char.origin[1]) < 0.01),
+                `${family}: ${fontVariant(bold, italic)} glyph ${char.c} must match its caret position`);
+        }
+        assert.match(inspect(output)[0].text, /Keep this line/);
+    }
+});
+
+test("size and color formatting retains embedded Type 1 fonts and searchable text", async () => {
+    const source = await readFile(new URL("fixtures/latex-type1.pdf", import.meta.url));
+    const original = characters(source).find(char => char.c === "O");
+    const output = save(applyEdits(source, [{ page: 0, id: 0, value: "Original text", format: { size: 20, color: "#008800" } }]));
+    const first = characters(output).find(char => char.c === "O");
+    assert.equal(first.name, original.name);
+    assert.ok(Math.abs(first.size - 20) < 0.01);
+    assert.match(inspect(output)[0].text, /Original text/);
+});
+
+test("whole-string overrides apply uniformly across mixed source styles", async () => {
+    const doc = await PDFDocument.create(), page = doc.addPage([360, 480]);
+    const regular = await doc.embedFont(StandardFonts.Helvetica), bold = await doc.embedFont(StandardFonts.HelveticaBold);
+    page.drawText("Hello ", { x: 40, y: 350, size: 16, font: regular });
+    page.drawText("world", { x: 81, y: 350, size: 16, font: bold, color: rgb(1, 0, 0) });
+    const source = await doc.save();
+    const output = save(applyEdits(source, [{ page: 0, id: 0, value: "Hello world",
+        format: { size: 20, bold: false, italic: false, color: "#000000" } }]));
+    const chars = characters(output);
+    assert.equal(chars.map(char => char.c).join(""), "Hello world");
+    for (const char of chars) {
+        assert.ok(Math.abs(char.size - 20) < 0.01); assert.equal(char.bold, false); assert.equal(char.italic, false);
+        assert.ok(char.color.every(v => Math.abs(v) < 0.01));
+    }
+});
+
+test("spacing and alignment use the same geometry for exported glyphs and caret stops", async () => {
+    const source = await fixture(), value = "AB\nCD";
+    const plain = applyEdits(source, [{ page: 0, id: 0, value }]);
+    const spaced = applyEdits(source, [{ page: 0, id: 0, value, format: { letterSpacing: 2, lineSpacing: 1.5 } }]);
+    const before = plain.editLayouts[0].layout, after = spaced.editLayouts[0].layout;
+    const stop = (layout, offset) => layout.stops.find(s => s.offset === offset);
+    assert.ok(Math.abs(stop(after, 1).x - stop(before, 1).x - 2) < 0.01);
+    assert.ok(Math.abs(stop(after, 3).baseline - stop(after, 0).baseline - before.pitch * 1.5) < 0.01);
+    const actual = characters(save(spaced)).filter(char => /[ABCD]/.test(char.c) && char.origin[1] < 165);
+    for (const char of actual) assert.ok(after.stops.some(s => Math.abs(s.x - char.origin[0]) < 0.01 && Math.abs(s.baseline - char.origin[1]) < 0.01));
+    plain.doc.destroy();
+    const width = inspect(source)[0].units[0].bbox[2] - 40;
+    const left = applyEdits(source, [{ page: 0, id: 0, value: "AB" }]);
+    const rowWidth = left.editLayouts[0].layout.stops.at(-1).x - 40;
+    left.doc.destroy();
+    for (const [align, fraction] of [["center", 0.5], ["right", 1]]) {
+        const result = applyEdits(source, [{ page: 0, id: 0, value: "AB", format: { align } }]);
+        const x = result.editLayouts[0].layout.stops[0].x;
+        assert.ok(Math.abs(x - (40 + (width - rowWidth) * fraction)) < 0.01);
+        const char = characters(save(result)).find(char => char.c === "A");
+        assert.ok(Math.abs(char.origin[0] - x) < 0.01);
+    }
+});
+
+test("underline and strikethrough export visible vectors inside the selection bounds", async () => {
+    const source = await fixture();
+    for (const format of [{ underline: true }, { strike: true }, { underline: true, strike: true }]) {
+        const result = applyEdits(source, [{ page: 0, id: 0, value: "AB", format }]);
+        const page = result.doc.loadPage(0), rects = [];
+        const device = new mupdf.Device({ fillPath(path, evenOdd, matrix) { rects.push(path.getBounds(null, matrix)); } });
+        try { page.runPageContents(device, mupdf.Matrix.identity); }
+        finally { device.close(); device.destroy(); page.destroy(); }
+        const decorations = rects.filter(rect => rect[0] >= 39 && rect[1] > 120 && rect[3] < 135);
+        assert.equal(decorations.length, (Number(Boolean(format.underline)) + Number(Boolean(format.strike))) * 2);
+        const bounds = result.editBounds[0].bounds;
+        for (const rect of decorations) assert.ok(rect[0] >= bounds[0] - 0.01 && rect[1] >= bounds[1] - 0.01 && rect[2] <= bounds[2] + 0.01 && rect[3] <= bounds[3] + 0.01);
+        assert.match(inspect(save(result))[0].text, /AB/);
+    }
+});
+
+test("invalid formatting is rejected before a PDF can be exported", async () => {
+    const source = await fixture();
+    for (const format of [null, [], { size: 0 }, { size: 301 }, { size: NaN }, { font: "unknown" },
+        { bold: "yes" }, { color: "red" }, { align: "justify" }, { letterSpacing: -6 }, { lineSpacing: 0 }, { unknown: true }])
+        assert.throws(() => applyEdits(source, [{ page: 0, id: 0, value: "Invalid", format }]), /formatting/);
+});
 
 test("inline caret geometry follows the exported PDF font advances and multiline fitting", async () => {
     const source = await readFile(new URL("fixtures/latex-type1.pdf", import.meta.url));

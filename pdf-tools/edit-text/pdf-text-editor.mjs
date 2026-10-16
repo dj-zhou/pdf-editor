@@ -2,6 +2,8 @@
 // Copyright 2026 Element Express, Inc.
 // MuPDF performs real text removal; replacement content remains searchable PDF text.
 import mupdf from "../../vendor/mupdf/1.28.1/mupdf.js";
+import { normalizeFormat } from "./text-format.mjs";
+import { BUNDLED_FONTS, fontVariant } from "./font-catalog.mjs";
 
 export const MAX_FILE_BYTES = 50 * 1024 * 1024;
 export const MODES = ["line", "span", "paragraph"];
@@ -243,17 +245,36 @@ function originalType1Fonts(page) {
     finally { resources.destroy(); object.destroy(); }
 }
 
-function planReplacement(unit, value, options, fallbacks, warnings, type1Fonts) {
+function planReplacement(unit, value, options, fallbacks, warnings, type1Fonts, offset = [0, 0], format = {}) {
+    if (!Array.isArray(offset) || offset.length !== 2 || !offset.every(Number.isFinite))
+        throw new Error("Invalid text position.");
     if (typeof value !== "string" || value.length > 20000) throw new Error("Replacement text must be shorter than 20,000 characters.");
+    format = normalizeFormat(format);
     const tokens = styledReplacement(unit.tokens, value.replace(/\r\n?/g, "\n"));
     let fallback = false;
     let tokenOffset = 0;
     const resolved = tokens.map(token => {
-        const { c, style } = token;
+        const { c } = token;
+        const style = { ...token.style, size: format.size ?? token.style.size,
+            color: format.color ? [1, 3, 5].map(i => parseInt(format.color.slice(i, i + 2), 16) / 255) : token.style.color };
         const offset = tokenOffset; tokenOffset += c.length;
-        if (c === "\n") return { ...token, offset, width: 0 };
+        if (c === "\n") return { ...token, style, offset, width: 0 };
         let font = style.font, glyph = font.encodeCharacter(c);
-        const originalType1 = type1Fonts.get(style.name), code = originalType1?.codes.get(c);
+        const bold = format.bold ?? font.isBold(), italic = format.italic ?? font.isItalic();
+        if (format.font || bold !== font.isBold() || italic !== font.isItalic()) {
+            const family = format.font || (font.isMono() ? "mono" : font.isSerif() ? "serif" : "sans");
+            const bundled = BUNDLED_FONTS[family], variant = fontVariant(bold, italic);
+            const name = bundled ? `${family}:${variant}` : family === "serif" ? (bold ? (italic ? "Times-BoldItalic" : "Times-Bold") : (italic ? "Times-Italic" : "Times-Roman"))
+                : family === "mono" ? (bold ? (italic ? "Courier-BoldOblique" : "Courier-Bold") : (italic ? "Courier-Oblique" : "Courier"))
+                : bold ? (italic ? "Helvetica-BoldOblique" : "Helvetica-Bold") : (italic ? "Helvetica-Oblique" : "Helvetica");
+            if (!fallbacks.has(name)) {
+                const bytes = options.bundledFonts?.[name];
+                if (bundled && !bytes?.byteLength) throw new Error("The selected font could not load. Try again.");
+                fallbacks.set(name, bundled ? new mupdf.Font(`${bundled.name}-${variant}`, bytes) : new mupdf.Font(name));
+            }
+            font = fallbacks.get(name); glyph = font.encodeCharacter(c);
+        }
+        const originalType1 = font === style.font ? type1Fonts.get(style.name) : undefined, code = originalType1?.codes.get(c);
         if ((!glyph || (originalType1 && !code)) && !/\s/.test(c)) {
             const name = baseFont(font);
             if (!fallbacks.has(name)) fallbacks.set(name, new mupdf.Font(name));
@@ -267,8 +288,8 @@ function planReplacement(unit, value, options, fallbacks, warnings, type1Fonts) 
             }
             glyph = font.encodeCharacter(c); fallback = true;
         }
-        return { ...token, offset, font, glyph, originalType1: font === style.font && code ? originalType1 : undefined,
-            code, width: font.advanceGlyph(glyph) * style.size };
+        return { ...token, style, offset, font, glyph, originalType1: font === style.font && code ? originalType1 : undefined,
+            code, width: Math.max(0, font.advanceGlyph(glyph) * style.size + (format.letterSpacing || 0)) };
     });
     const width = Math.max(10, unit.bbox[2] - unit.origins[0][0]);
     function layout(scale) {
@@ -286,7 +307,7 @@ function planReplacement(unit, value, options, fallbacks, warnings, type1Fonts) 
         return rows;
     }
     let scale = 1, rows = layout(scale);
-    if (options.fit) {
+    if (options.fit && format.size === undefined) {
         if (unit.mode === "paragraph") {
             while (scale > 0.5 && (rows.length > unit.origins.length || rows.some(r => r.reduce((n, t) => n + t.width * scale, 0) > width + 0.1))) {
                 scale = Math.max(0.5, scale - 0.04); rows = layout(scale);
@@ -298,7 +319,8 @@ function planReplacement(unit, value, options, fallbacks, warnings, type1Fonts) 
     }
     if (rows.length > unit.origins.length || rows.some(r => r.reduce((n, t) => n + t.width * scale, 0) > width + 0.5))
         warnings.add("Some replacement text extends beyond its original box. Review the preview before downloading.");
-    return { unit, rows, scale, fallback };
+    return { unit, rows, scale, fallback, offset, format, width,
+        pitch: unit.pitch * ((format.size ?? unit.main.size) / unit.main.size) * (format.lineSpacing ?? 1) };
 }
 
 function sampledBackground(pixmap, rect) {
@@ -369,15 +391,18 @@ function overlayPdf(bounds, plans, background) {
                 finally { path.destroy(); }
             }
             plan.rows.forEach((row, index) => {
-                let x = index === 0 ? plan.unit.origins[0][0] : Math.min(...plan.unit.origins.map(p => p[0]));
-                const y = plan.unit.origins[0][1] + index * plan.unit.pitch * plan.scale;
+                let x = (index === 0 ? plan.unit.origins[0][0] : Math.min(...plan.unit.origins.map(p => p[0]))) + plan.offset[0];
+                const rowWidth = row.reduce((sum, token) => sum + token.width * plan.scale, 0);
+                x += (plan.width - rowWidth) * (plan.format.align === "right" ? 1 : plan.format.align === "center" ? 0.5 : 0);
+                const y = plan.unit.origins[0][1] + index * plan.pitch * plan.scale + plan.offset[1];
                 const rowBounds = [];
                 const rowStops = [];
                 if (row.length) offset = row[0].offset;
                 rowStops.push({ offset, x, baseline: y, row: index });
                 for (const token of row) {
+                    const size = token.style.size * plan.scale;
                     if (!/\s/.test(token.c)) {
-                        const text = new mupdf.Text(), size = token.style.size * plan.scale;
+                        const text = new mupdf.Text();
                         try {
                             text.showGlyph(token.font, [size, 0, 0, -size, x, y], token.glyph, token.c.codePointAt(0));
                             if (token.originalType1) {
@@ -389,16 +414,26 @@ function overlayPdf(bounds, plans, background) {
                             glyphBounds.push(rect); rowBounds.push(rect);
                         } finally { text.destroy(); }
                     }
+                    for (const decoration of [plan.format.underline ? 0.12 : undefined, plan.format.strike ? -0.3 : undefined]) {
+                        if (decoration === undefined || !token.width) continue;
+                        const thickness = Math.max(0.5, size * 0.06), edge = y + size * decoration;
+                        const rect = [x, edge, x + token.width * plan.scale, edge + thickness];
+                        const path = new mupdf.Path();
+                        try { path.rect(...rect); device.fillPath(path, false, mupdf.Matrix.identity, mupdf.ColorSpace.DeviceRGB, token.style.color, 1); }
+                        finally { path.destroy(); }
+                        glyphBounds.push(rect); rowBounds.push(rect);
+                    }
                     x += token.width * plan.scale;
                     offset = token.offset + token.c.length;
                     rowStops.push({ offset, x, baseline: y, row: index });
                 }
-                const rect = rowBounds.length ? union(rowBounds) : [x, y - plan.unit.main.size * plan.scale * 0.8, x, y + plan.unit.main.size * plan.scale * 0.2];
+                const size = (plan.format.size ?? plan.unit.main.size) * plan.scale;
+                const rect = rowBounds.length ? union(rowBounds) : [x, y - size * 0.8, x, y + size * 0.2];
                 stops.push(...rowStops.map(stop => ({ ...stop, top: rect[1], bottom: rect[3] })));
                 offset++; // Explicit newline between rows in line/span mode.
             });
             plan.displayBounds = glyphBounds.length ? union(glyphBounds) : undefined;
-            plan.layout = { stops, bounds: plan.displayBounds || plan.unit.bbox, pitch: plan.unit.pitch * plan.scale };
+            plan.layout = { stops, bounds: plan.displayBounds || plan.unit.bbox.map((v, i) => v + plan.offset[i % 2]), pitch: plan.pitch * plan.scale };
         }
         writer.endPage(); writer.close();
         const overlay = new mupdf.PDFDocument(buffer);
@@ -507,7 +542,7 @@ export function applyEdits(bytes, edits, options = {}) {
                     const unit = extracted.units[edit.id];
                     if (!unit || seen.has(edit.id)) throw new Error("Invalid or duplicate text selection.");
                     seen.add(edit.id);
-                    return planReplacement(unit, edit.value, options, fallbacks, warnings, type1.fonts);
+                    return planReplacement(unit, edit.value, options, fallbacks, warnings, type1.fonts, edit.offset, edit.format);
                 });
                 planRemoval(plans, extracted.characters);
                 if (options.cover) background = page.toPixmap(mupdf.Matrix.identity, mupdf.ColorSpace.DeviceRGB, false, false);

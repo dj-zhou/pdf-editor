@@ -1,0 +1,171 @@
+{
+  "repository": "https://github.com/google/fonts",
+  "revision": "1d0e46c7933245c8180fe83e47917961c913bbdb",
+  "files": [
+    {
+      "path": "lato/Lato-Regular.ttf",
+      "bytes": 656568,
+      "sha256": "d636e4683231f931eda222d588e944d082bfd3bdba02f928bee461c0f185b251"
+    },
+    {
+      "path": "lato/Lato-Bold.ttf",
+      "bytes": 656544,
+      "sha256": "8a0aace75d33794eece4b28187bfc1df0bbd2888b5d8a56e01788c8d65d16be1"
+    },
+    {
+      "path": "lato/Lato-Italic.ttf",
+      "bytes": 722900,
+      "sha256": "e399c44efe1387100531d26c7e4800c5d12251b890d6654a3098c7c679cb1786"
+    },
+    {
+      "path": "lato/Lato-BoldItalic.ttf",
+      "bytes": 698364,
+      "sha256": "62c1b7f0d2e74b45960154c3520efc337b553db0961bfdc950d5618334596cc8"
+    },
+    {
+      "path": "crimsontext/CrimsonText-Regular.ttf",
+      "bytes": 107200,
+      "sha256": "48e6c5d5ad1d01599d374ecb817e15890d1feb3b8a3a88e527d44c90389e1f06"
+    },
+    {
+      "path": "crimsontext/CrimsonText-Bold.ttf",
+      "bytes": 112796,
+      "sha256": "a3a0765fc5e8d0b49b540a23aefe0184887dd79f06a0bdf4db7035cea6befa93"
+    },
+    {
+      "path": "crimsontext/CrimsonText-Italic.ttf",
+      "bytes": 110216,
+      "sha256": "4ed1699ac7c64e8b3d33f6bb8323c3d7206b0d7bacb9ee2d65c697e6014d29de"
+    },
+    {
+      "path": "crimsontext/CrimsonText-BoldItalic.ttf",
+      "bytes": 115112,
+      "sha256": "467013e913e46304760461c46661c994b2aa1769e3fbd31371026300315181b4"
+    },
+    {
+      "path": "cousine/Cousine-Regular.ttf",
+      "bytes": 296856,
+      "sha256": "1da22250675fc4c42fcf3a9736c44bc0570516105331443b663fd5cfbd1412fe"
+    },
+    {
+      "path": "cousine/Cousine-Bold.ttf",
+      "bytes": 298048,
+      "sha256": "17c8a7245156d2253531c9e529474937b09d9f641c5ae7695c5e33f22822eef4"
+    },
+    {
+      "path": "cousine/Cousine-Italic.ttf",
+      "bytes": 306880,
+      "sha256": "ea2a76ae3d0ece9cd59f0d30fdc08dd70e8f5f457beee5b0852a7b50c2286c7c"
+    },
+    {
+      "path": "cousine/Cousine-BoldItalic.ttf",
+      "bytes": 308292,
+      "sha256": "848e858726fee0ae27b754e4cd6a2755209bf1428a8c91f747696d58c33906c3"
+    },
+    {
+      "path": "lato/OFL.txt",
+      "bytes": 4407,
+      "sha256": "74ba064d03f1f1c4a952da936c3eb71866c34404916734de3cae73b34357e59e"
+    },
+    {
+      "path": "crimsontext/OFL.txt",
+      "bytes": 4393,
+      "sha256": "50fd67cddc097377a5c871e8452b778bc5aedfa3480a705cb27c5e3a078218df"
+    },
+    {
+      "path": "cousine/OFL.txt",
+      "bytes": 4387,
+      "sha256": "b81c4d4dc0a9f72c9155e78187316e016e2012a8102468804173dc61468b906d"
+    },
+    {
+      "path": "liberation/LiberationSerif-BoldItalic.ttf",
+      "bytes": 376772,
+      "sha256": "f17db8af71e24d2066b587546021d4f0b296be389512b658dec3c09affeb11a7"
+    },
+    {
+      "path": "liberation/LiberationSerif-Italic.ttf",
+      "bytes": 375632,
+      "sha256": "0e3dea9f8d613e006ccfa62201f33e265d19167bd0907725c3e145368b04fc2e"
+    },
+    {
+      "path": "liberation/LiberationSerif-Bold.ttf",
+      "bytes": 370096,
+      "sha256": "d754ba427cfe0bca54ae052384baa8f842da5bd6550ad4da024ac441e7a7d5ce"
+    },
+    {
+      "path": "liberation/LiberationSerif-Regular.ttf",
+      "bytes": 393576,
+      "sha256": "058ea80864aef09a23f45cbec2bb5400bc3dfbdea01c3f10538a21fcb497fb74"
+    },
+    {
+      "path": "liberation/LiberationSans-BoldItalic.ttf",
+      "bytes": 408996,
+      "sha256": "698da70fc191cc5f33ad4d6d3fe830fe4624b898ea2e3169955928b7c491f1ee"
+    },
+    {
+      "path": "liberation/LiberationSans-Italic.ttf",
+      "bytes": 415816,
+      "sha256": "e5bae5c4cde31f22142753855f4f8fb86da6ff39955ed3c0a11248b0d16948b0"
+    },
+    {
+      "path": "liberation/LiberationSans-Bold.ttf",
+      "bytes": 414456,
+      "sha256": "788abee4c806d660e8aee46689dd8540cd4bb98da03dcc9d171ce3efd99a9173"
+    },
+    {
+      "path": "liberation/LiberationSans-Regular.ttf",
+      "bytes": 410712,
+      "sha256": "76d04c18ea243f426b7de1f3ad208e927008f961dc5945e5aad352d0dfde8ee8"
+    },
+    {
+      "path": "liberation/LICENSE",
+      "bytes": 4414,
+      "sha256": "93fed46019c38bbe566b479d22148e2e8a1e85ada614accb0211c37b2c61c19b"
+    },
+    {
+      "path": "liberation/AUTHORS",
+      "bytes": 379,
+      "sha256": "b627404917ef824675cb24c32e2facd0b57650627955f3fc3d8a8863c5d0adfc"
+    },
+    {
+      "path": "michroma/Michroma-Regular.ttf",
+      "bytes": 64344,
+      "sha256": "b62301163788bc5b7f8fcac0b74b184e34e1827e577b499ecb724da065098f87",
+      "source": "https://raw.githubusercontent.com/google/fonts/1d0e46c7933245c8180fe83e47917961c913bbdb/ofl/michroma/Michroma-Regular.ttf"
+    },
+    {
+      "path": "michroma/OFL.txt",
+      "bytes": 4395,
+      "sha256": "33c39ce59a45bfb0dae3280e98bdb46be59d6d68efc62d4dc5fae90a26d2f393",
+      "source": "https://raw.githubusercontent.com/google/fonts/1d0e46c7933245c8180fe83e47917961c913bbdb/ofl/michroma/OFL.txt"
+    },
+    {
+      "path": "orbitron/Orbitron-Regular.ttf",
+      "bytes": 36340,
+      "sha256": "f8c2b5e8dbd870bb73ad0802b1ffcdff4e053c5c074fe403132b9c1852d962d9",
+      "source": "https://raw.githubusercontent.com/googlefonts/orbitron-vf/f16482824e0ce4d008dee59b9b632e9ce9663359/fonts/ttf/Orbitron-Regular.ttf"
+    },
+    {
+      "path": "orbitron/Orbitron-Bold.ttf",
+      "bytes": 37648,
+      "sha256": "d2cb79f9a755ef945bc53372090bbbd1913a22e7dada744842c7c68c76c47be9",
+      "source": "https://raw.githubusercontent.com/googlefonts/orbitron-vf/f16482824e0ce4d008dee59b9b632e9ce9663359/fonts/ttf/Orbitron-Bold.ttf"
+    },
+    {
+      "path": "orbitron/OFL.txt",
+      "bytes": 4426,
+      "sha256": "ab609b0e110d622435ff337cdf233288556e011bbf9bd0550be98846c0630819",
+      "source": "https://raw.githubusercontent.com/googlefonts/orbitron-vf/f16482824e0ce4d008dee59b9b632e9ce9663359/OFL.txt"
+    }
+  ],
+  "liberation": {
+    "repository": "https://github.com/liberationfonts/liberation-fonts",
+    "version": "2.1.5",
+    "archive": "https://github.com/liberationfonts/liberation-fonts/files/7261482/liberation-fonts-ttf-2.1.5.tar.gz",
+    "archive_sha256": "7191c669bf38899f73a2094ed00f7b800553364f90e2637010a69c0e268f25d0"
+  },
+  "orbitron": {
+    "repository": "https://github.com/googlefonts/orbitron-vf",
+    "revision": "f16482824e0ce4d008dee59b9b632e9ce9663359"
+  }
+}

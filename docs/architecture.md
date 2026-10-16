@@ -16,8 +16,16 @@ password field or extraction-mode selector.
 Auto-shrink and background coverage are in the top toolbar. Download is disabled
 until there are edits, including an active inline draft, and becomes a bright
 filled button when the edited PDF is available. The toolbar has no edit counter.
-Find and replace is permanently visible in the sidebar beneath compact editing
-instructions. There is no custom font upload control.
+Find and Replace is collapsed by default in the sidebar below text formatting.
+Clicking its heading or activating it with the keyboard expands or collapses the
+search controls. There is no custom font upload control.
+On desktop, the sidebar content sticks 12 pixels below the viewport's top edge
+while scrolling through the editor, matching Annotate PDF. Its own scroll area
+keeps controls reachable on short screens. Inside Ship Toolkit's auto-sized
+iframe, the host sends its viewport height and scroll offset relative to the
+iframe. The editor validates the parent window and origin before applying this
+geometry to the sticky sidebar. The mobile sidebar remains in normal document
+flow beneath the preview.
 
 Clicking text opens an input directly on the PDF. The visible text remains on
 MuPDF's canvas, preserving its original embedded font, color, size, and spacing.
@@ -74,7 +82,7 @@ are copied into the Ship Toolkit source tree or deployment image.
 ## Deployment
 
 Deploy this repository's `dist/` to an HTTPS static host. Ship Toolkit embeds the
-application by URL; the iframe sends layout height only. See README.md for local
+application by URL; the iframe sends layout height and receives viewport geometry only. See README.md for local
 preview, localization, and iframe requirements. There is no Python backend.
 
 ## Limits and licensing

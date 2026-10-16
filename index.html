@@ -61,35 +61,91 @@
                             <canvas id="canvas" aria-label="PDF page preview"></canvas>
                             <div class="text-editor-boxes" id="boxes" aria-label="Editable text"></div>
                             <form class="text-editor-inline" id="inline-editor" hidden aria-label="Edit PDF text in place">
-                                <textarea id="inline-text" aria-label="Edit text in place" aria-describedby="inline-instructions"
+                                <textarea id="inline-text" aria-label="Edit text in place"
                                     rows="1" spellcheck="false" maxlength="20000" wrap="off"></textarea>
+                                <button id="inline-move" class="text-editor-move-frame" type="button" aria-label="Move text"
+                                    title="Drag the box border to move text. Use arrow keys for fine adjustments; Shift moves faster.">
+                                    <span class="text-editor-move-edge text-editor-move-edge--top" aria-hidden="true"></span>
+                                    <span class="text-editor-move-edge text-editor-move-edge--bottom" aria-hidden="true"></span>
+                                    <span class="text-editor-move-edge text-editor-move-edge--left" aria-hidden="true"></span>
+                                    <span class="text-editor-move-edge text-editor-move-edge--right" aria-hidden="true"></span>
+                                </button>
                                 <div id="inline-caret-layer" aria-hidden="true"></div>
-                                <div class="text-editor-inline-actions">
-                                    <button id="inline-save" type="submit">Save text</button>
-                                    <button id="inline-cancel" type="button">Cancel editing</button>
-                                </div>
                             </form>
                         </div>
                     </div>
                 </div>
                 <aside class="text-editor-sidebar">
-                    <div class="text-editor-instructions">
-                        <h2>Edit on the page</h2>
-                        <p id="inline-instructions">Click text and type directly on the PDF. Enter saves a line; Escape cancels.</p>
-                        <p>Click outside the text to save. Delete all its characters to remove it.</p>
-                        <p>Background coverage paints a sampled solid color over the text box. Review patterned backgrounds carefully.</p>
+                    <div class="text-editor-sidebar-content">
+                        <section class="text-editor-format" id="text-format" aria-labelledby="format-title">
+                            <h2 id="format-title">Text formatting</h2>
+                            <p>Applies to the whole selected string.</p>
+                            <fieldset id="format-fields" disabled>
+                                <legend class="sr-only">Text formatting</legend>
+                                <label>Font family<select id="text-font">
+                                    <option value="original">Original font</option>
+                                    <option value="arial">Arial (compatible)</option>
+                                    <option value="times-new-roman">Times New Roman (compatible)</option>
+                                    <option value="courier-new">Courier New (compatible)</option>
+                                    <option value="sans">Sans serif</option>
+                                    <option value="serif">Serif</option>
+                                    <option value="mono">Monospace</option>
+                                    <option value="lato">Lato</option>
+                                    <option value="crimson">Crimson Text</option>
+                                    <option value="michroma">Michroma</option>
+                                    <option value="orbitron">Orbitron</option>
+                                </select></label>
+                                <div class="text-editor-format-row">
+                                    <label>Font size (pt)<input id="text-size" type="number" min="1" max="300" step="0.01" value="12" required></label>
+                                    <label>Text color<input id="text-color" type="color" value="#000000"></label>
+                                </div>
+                                <div class="text-editor-format-toggles" role="group" aria-label="Text formatting">
+                                    <button id="text-bold" type="button" aria-label="Bold" title="Bold" aria-pressed="false">
+                                        <svg class="text-editor-icon-bold" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4h6.5a4 4 0 010 8H7zM7 12h7a4 4 0 010 8H7z"></path></svg>
+                                    </button>
+                                    <button id="text-italic" type="button" aria-label="Italic" title="Italic" aria-pressed="false">
+                                        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 4h8M6 20h8M14 4L10 20"></path></svg>
+                                    </button>
+                                    <button id="text-bold-italic" type="button" aria-label="Bold italic" title="Bold italic" aria-pressed="false">
+                                        <svg class="text-editor-icon-bold" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4h6.5a4 4 0 010 8H7zM7 12h7a4 4 0 010 8H7z" transform="translate(2 0) skewX(-10)"></path></svg>
+                                    </button>
+                                    <button id="text-underline" type="button" aria-label="Underline" title="Underline" aria-pressed="false">
+                                        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4v7a5 5 0 0010 0V4M5 20h14"></path></svg>
+                                    </button>
+                                    <button id="text-strike" type="button" aria-label="Strikethrough" title="Strikethrough" aria-pressed="false">
+                                        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 4h12M12 4v6M12 14v6M4 12h16"></path></svg>
+                                    </button>
+                                </div>
+                                <div class="text-editor-format-toggles" id="text-align" role="group" aria-label="Alignment">
+                                    <button id="text-align-left" type="button" data-text-align="left" aria-label="Align left" title="Align left" aria-pressed="true">
+                                        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 10h11M4 14h16M4 18h9"></path></svg>
+                                    </button>
+                                    <button id="text-align-center" type="button" data-text-align="center" aria-label="Align center" title="Align center" aria-pressed="false">
+                                        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M6.5 10h11M4 14h16M7.5 18h9"></path></svg>
+                                    </button>
+                                    <button id="text-align-right" type="button" data-text-align="right" aria-label="Align right" title="Align right" aria-pressed="false">
+                                        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M9 10h11M4 14h16M11 18h9"></path></svg>
+                                    </button>
+                                </div>
+                                <div class="text-editor-format-row">
+                                    <label>Letter spacing (pt)<input id="text-letter-spacing" type="number" min="-5" max="30" step="0.1" value="0" required></label>
+                                    <label>Line spacing<input id="text-line-spacing" type="number" min="0.5" max="3" step="0.1" value="1" required></label>
+                                </div>
+                                <button id="text-format-reset" type="button">Reset formatting</button>
+                            </fieldset>
+                        </section>
+                        <details class="text-editor-find">
+                            <summary id="find-title"><h2>Find and Replace</h2></summary>
+                            <form id="find-form">
+                                <label class="field text-editor-find-row"><span class="field__label">Find</span><input id="find" type="text" required data-loaded disabled></label>
+                                <label class="field text-editor-find-row"><span class="field__label">Replace with</span><input id="replace-with" type="text" data-loaded disabled></label>
+                                <label class="field text-editor-find-row"><span class="field__label">Pages</span><input id="range" type="text" placeholder="All pages; e.g. 1-3, 5, 8-" data-loaded disabled></label>
+                                <label class="text-editor-check"><input id="case" type="checkbox" data-loaded disabled>Case sensitive</label>
+                                <label class="text-editor-check"><input id="regex" type="checkbox" data-loaded disabled>Regular expression</label>
+                                <button class="button button--filled" data-loaded disabled>Replace All</button>
+                            </form>
+                        </details>
                     </div>
-                    <section class="text-editor-find" aria-labelledby="find-title">
-                        <h2 id="find-title">Find and replace</h2>
-                        <form id="find-form">
-                            <label class="field text-editor-find-row"><span class="field__label">Find</span><input id="find" type="text" required data-loaded disabled></label>
-                            <label class="field text-editor-find-row"><span class="field__label">Replace with</span><input id="replace-with" type="text" data-loaded disabled></label>
-                            <label class="field text-editor-find-row"><span class="field__label">Pages</span><input id="range" type="text" placeholder="All pages; e.g. 1-3, 5, 8-" data-loaded disabled></label>
-                            <label class="text-editor-check"><input id="case" type="checkbox" data-loaded disabled>Case sensitive</label>
-                            <label class="text-editor-check"><input id="regex" type="checkbox" data-loaded disabled>Regular expression</label>
-                            <button class="button button--filled" data-loaded disabled>Replace All</button>
-                        </form>
-                    </section>
                 </aside>
             </div>
         </section>

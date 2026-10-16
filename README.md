@@ -1,6 +1,10 @@
 # PDF Editor
 
-Standalone browser application for editing existing PDF text in place, searching and replacing text, and downloading edited PDFs. Supports 15 languages, original-font previews, Type 1 LaTeX fonts, undo, page navigation, drag and drop, and optional auto-shrink/background coverage.
+Standalone browser application for editing and moving existing PDF text in place, searching and replacing text, and downloading edited PDFs. Supports 15 languages, original-font previews, Type 1 LaTeX fonts, undo, page navigation, drag and drop, and optional auto-shrink/background coverage.
+
+Select a text string, then drag its box border to reposition it. Click inside the box to edit the text. With the border focused, use arrow keys for 1-point adjustments or Shift+arrow for 10 points. Enter or clicking outside saves the text and position; Escape cancels both. Positions are included in undo and PDF downloads.
+
+The Text formatting panel applies to the whole selected string: font family, size in points, bold, italic, underline, strikethrough, color, alignment within the original text width, letter spacing, and line spacing. Fonts include original, sans serif, serif, monospace, Arial-compatible (Liberation Sans), Times New Roman-compatible (Liberation Serif), Courier New-compatible (Cousine), Lato, Crimson Text, Michroma, and Orbitron. Michroma provides regular; Orbitron provides regular and bold; the other named choices provide all four regular/bold/italic/bold-italic styles. Unsupported style controls are disabled. Font files are loaded from this app's own origin on first use and embedded into downloads. Explicit font sizes override auto-shrink. Formatting previews use the same PDF writer as downloads and participate in Save, Cancel, Undo, and search/replace. Reset formatting restores source styles while keeping text edits and movement. Original fonts are retained where possible; changing the family or bold/italic variant can substitute a compatible font.
 
 The engine is **MuPDF.js 1.28.1 / WebAssembly**, not Python PyMuPDF. No Python service, container, private Ship Toolkit checkout or production credentials are required.
 
@@ -60,7 +64,7 @@ For a manual deployment after configuring Cloudflare authentication, run
 
 ## Ship Toolkit integration
 
-Ship Toolkit embeds this app in an iframe using a separately configured URL. The only message sent to the host is `pdf-editor:height` with a numeric layout height. No document contents, editing commands or engine APIs cross the frame boundary. `?embed=1&lang=…` hides the duplicated page heading. All runtime scripts, translations and engine assets load from this application's origin.
+Ship Toolkit embeds this app in an iframe using a separately configured URL. The editor sends `pdf-editor:height` with a numeric layout height. The host sends `pdf-editor:viewport` with its visible height and top offset relative to the iframe, so the sidebar follows outer-page scrolling. Both sides check the sender and origin. No document contents, editing commands or engine APIs cross the frame boundary. `?embed=1&lang=…` hides the duplicated page heading. All runtime scripts, translations and engine assets load from this application's origin.
 
 ## Source and license
 

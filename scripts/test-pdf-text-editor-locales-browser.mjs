@@ -31,9 +31,15 @@ try {
         assert.equal(await page.locator("h1").textContent(), tr("Edit PDF Text"));
         assert.equal(await page.locator("#open").textContent(), tr("Open PDF"));
         assert.equal(await page.locator("#download").textContent(), tr("Download PDF"));
-        assert.equal(await page.locator("#find-title").textContent(), tr("Find and replace"));
+        assert.equal(await page.locator("#find-title").textContent(), tr("Find and Replace"));
+        assert.equal(await page.locator("#format-title").textContent(), tr("Text formatting"));
+        assert.equal(await page.locator("#text-bold").getAttribute("aria-label"), tr("Bold"));
+        assert.equal(await page.locator("#text-format-reset").textContent(), tr("Reset formatting"));
+        assert.equal(await page.locator('#text-font option[value="original"]').textContent(), tr("Original font"));
         assert.equal(await page.locator("#status").count(), 0);
         assert.equal(await page.locator("#range").getAttribute("placeholder"), tr("All pages; e.g. 1-3, 5, 8-"));
+        assert.equal(await page.locator("#find").isVisible(), false);
+        await page.locator("#find-title").click();
         assert.equal(await page.locator("#find").isVisible(), true);
         assert.equal(await page.locator("#fit").isChecked(), false);
         assert.equal(await page.locator("#cover").isChecked(), false);

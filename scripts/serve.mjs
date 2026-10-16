@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url";
 const root = fileURLToPath(new URL("../dist/", import.meta.url));
 const port = Number(process.env.PORT || 8011);
 const host = process.env.HOST || "127.0.0.1";
-const mime = { ".html": "text/html; charset=utf-8", ".js": "text/javascript", ".mjs": "text/javascript", ".css": "text/css", ".wasm": "application/wasm", ".json": "application/json" };
+const mime = { ".html": "text/html; charset=utf-8", ".js": "text/javascript", ".mjs": "text/javascript", ".css": "text/css", ".wasm": "application/wasm", ".ttf": "font/ttf", ".json": "application/json" };
 http.createServer(async (req, res) => {
     try {
         let filename = path.resolve(root, "." + decodeURIComponent(new URL(req.url, "http://localhost").pathname));

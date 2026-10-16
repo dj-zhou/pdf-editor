@@ -86,8 +86,13 @@ try {
     assert.equal(await page.locator("#replacement, #selection-form").count(), 0, "there must be no external replacement text box");
     assert.equal(await page.locator("#password, #mode").count(), 0, "password and editing mode controls must be removed");
     assert.equal(await page.locator("#font, #font-info").count(), 0, "custom fallback font controls must be removed");
-    assert.equal(await page.locator(".text-editor-find summary").count(), 0, "find and replace must not be collapsible");
-    assert.equal(await page.locator("#find").isVisible(), true, "find and replace must be permanently visible");
+    assert.equal(await page.locator("#find-title").textContent(), "Find and Replace");
+    assert.equal(await page.locator("#find").isVisible(), false, "find and replace must start collapsed");
+    await page.locator("#find-title").click();
+    assert.equal(await page.locator("#find").isVisible(), true);
+    await page.locator("#find-title").press("Enter");
+    assert.equal(await page.locator("#find").isVisible(), false, "keyboard activation must collapse the section");
+    await page.locator("#find-title").press("Enter");
     assert.equal(await page.locator("#edit-count").count(), 0, "edit counts must be removed");
     assert.equal(await page.locator(".text-editor-toolbar #fit, .text-editor-toolbar #cover").count(), 2,
         "both editing options must be in the top toolbar");
@@ -242,7 +247,7 @@ try {
     await page.screenshot({ path: output("mobile-inline.png"), fullPage: true });
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);
     assert.equal(overflow, false, "mobile page overflows horizontally");
-    await page.locator("#inline-save").click(); await idle(); await editsPresent(true);
+    await input.press("Enter"); await idle(); await editsPresent(true);
     await page.locator("#reset").click(); await idle();
 
     // Closely spaced font boxes overlap. Opening the inline input temporarily
@@ -335,8 +340,72 @@ try {
         });
         assert.equal(legacyFonts, 2, "download must retain the regular and bold Type 1 fonts");
     } finally { latexFonts.destroy(); latexObject.destroy(); latexText.destroy(); latexPage.destroy(); latexOutput.destroy(); }
+    // Move-only drafts must save/export, and later editing/search must retain the position.
+    await page.locator("#file").setInputFiles(output("input.pdf")); await idle();
+    await page.waitForFunction(() => document.querySelectorAll(".text-editor-box").length === 2);
+    await page.locator("#zoom").selectOption("1"); await idle();
+    await begin("Original text");
+    const moveHandle = page.locator("#inline-move");
+    const startPosition = await input.boundingBox();
+    const handle = await moveHandle.boundingBox();
+    assert.equal(await page.locator(".text-editor-inline-actions, #inline-save, #inline-cancel").count(), 0,
+        "inline editing must not show floating Save/Cancel controls");
+    await page.mouse.move(handle.x + handle.width / 2, handle.y + 5);
+    await page.mouse.down();
+    await page.mouse.move(handle.x + handle.width / 2 - 15, handle.y + 5 + 65, { steps: 8 });
+    await page.mouse.up();
+    await moveHandle.press("ArrowRight");
+    await moveHandle.press("Shift+ArrowDown");
+    const movedPosition = await input.boundingBox();
+    assert.ok(Math.abs(movedPosition.x - startPosition.x + 14) < 1);
+    assert.ok(Math.abs(movedPosition.y - startPosition.y - 75) < 1);
+    assert.equal(await page.locator("#download").isDisabled(), false);
+    await page.waitForFunction(() => {
+        const outline = document.querySelector('.text-editor-box[data-id="0"]').getBoundingClientRect();
+        const input = document.querySelector("#inline-text").getBoundingClientRect();
+        return Math.abs(outline.top - input.top) < 1 && Math.abs(outline.left - input.left) < 2;
+    });
+    await page.screenshot({ path: output("move-text-draft.png"), fullPage: true });
+    // Download commits a move even when no characters have changed.
+    const [movedDownload] = await Promise.all([page.waitForEvent("download"), page.locator("#download").click()]);
+    await movedDownload.saveAs(output("moved-output.pdf")); await idle();
+    const movedPdf = openPdf(new Uint8Array(await fs.readFile(output("moved-output.pdf"))));
+    const movedPage = movedPdf.loadPage(0), movedText = movedPage.toStructuredText();
+    let movedOrigin;
+    try {
+        movedText.walk({ onChar(c, origin, font) { if (c === "O") movedOrigin = origin; font.destroy(); } });
+        assert.ok(Math.abs(movedOrigin[0] - 26) < 0.01 && Math.abs(movedOrigin[1] - 205) < 0.01,
+            "downloaded glyphs must use the moved PDF coordinates");
+        assert.match(movedText.asText(), /Keep this line/);
+    } finally { movedText.destroy(); movedPage.destroy(); movedPdf.destroy(); }
+    await begin("Original text");
+    const reopenedPosition = await input.boundingBox();
+    assert.ok(Math.abs(reopenedPosition.x - movedPosition.x) < 1 && Math.abs(reopenedPosition.y - movedPosition.y) < 1);
+    await moveHandle.focus(); await moveHandle.press("Shift+ArrowRight");
+    await input.fill("Discard this text and move");
+    await input.press("Escape"); await idle();
+    await begin("Original text");
+    assert.equal(await input.inputValue(), "Original text");
+    assert.ok(Math.abs((await input.boundingBox()).x - movedPosition.x) < 1, "cancel must restore the saved position");
+    await input.fill("Changed text"); await input.press("Enter"); await idle();
+    await page.locator("#find").fill("Changed text");
+    await page.locator("#replace-with").fill("Original text");
+    await page.locator("#range").fill("1");
+    await page.locator("#find-form button").click(); await idle();
+    await begin("Original text");
+    assert.equal(await input.inputValue(), "Original text");
+    assert.ok(Math.abs((await input.boundingBox()).x - movedPosition.x) < 1, "replacing back to source text must retain the move");
+    await input.press("Escape"); await idle();
+    await page.locator("#undo").click(); await idle(); // Undo search.
+    await page.locator("#undo").click(); await idle(); // Undo text edit.
+    await page.locator("#undo").click(); await idle(); // Undo move.
+    await editsPresent(false);
+    await begin("Original text");
+    assert.ok(Math.abs((await input.boundingBox()).x - startPosition.x) < 1, "undo must restore the original text position");
+    await moveHandle.focus(); await moveHandle.press("ArrowLeft"); await moveHandle.press("Escape"); await idle();
+    assert.equal(await page.locator("#download").isDisabled(), true, "canceling a move-only draft must leave no edits");
     assert.deepEqual(errors, []);
     assert.ok(requests.every(request => request.method === "GET" && request.url.startsWith(`${origin}/`)));
     console.log(JSON.stringify({ browser: "Chrome", dragAndDrop: true, replacementConfirmation: true, inPlaceEdit: true, enterEscapeClickAway: true, multilineAndMobile: true,
-        draftIncludedInDownload: true, tightLinesPreserved: true, latexType1: true, pages: 2, errors, network: "Same-origin GETs only; no document uploads.", outputDir }));
+        draftIncludedInDownload: true, moveText: true, tightLinesPreserved: true, latexType1: true, pages: 2, errors, network: "Same-origin GETs only; no document uploads.", outputDir }));
 } finally { await browser.close(); }

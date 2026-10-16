@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright 2026 Element Express, Inc.
 import { t } from "../../i18n.mjs";
+import { normalizeFormat } from "./text-format.mjs";
+import { fontVariants } from "./font-catalog.mjs";
 
 const $ = id => document.getElementById(id);
 const workspace = $("text-editor");
@@ -12,6 +14,9 @@ let loaded = false, busy = false, count = 0, page = 0, name = "", selected;
 let edits = [], history = [], units = [], savedState = "[]";
 let bounds = [0, 0, 612, 792], cssScale = 1;
 let initialInlineValue = "";
+let initialInlineOffset = [0, 0], moveDrag;
+let initialInlineFormat = "{}";
+const formatPanel = $("text-format");
 let fileDragDepth = 0;
 
 function createWorker() {
@@ -53,15 +58,19 @@ function controls() {
     $("reset").disabled = busy || !edits.length;
     $("prev").disabled = !loaded || busy || page === 0;
     $("next").disabled = !loaded || busy || page === count - 1;
-    for (const id of ["inline-text", "inline-save", "inline-cancel"]) $(id).disabled = busy || !loaded || !selected;
+    for (const id of ["inline-text", "inline-move"]) $(id).disabled = busy || !loaded || !selected;
+    $("format-fields").disabled = busy || !loaded || !selected;
+    for (const [id, variant] of [["text-bold", "Bold"], ["text-italic", "Italic"], ["text-bold-italic", "BoldItalic"]])
+        $(id).disabled = busy || !loaded || !selected || !fontVariants(selected?.format.font).includes(variant);
     $("boxes").querySelectorAll("button").forEach(button => { button.disabled = busy; });
     const hasEdits = selected
-        ? edits.some(edit => edit.page !== selected.page || edit.id !== selected.id) || inlineText.value !== selected.text
+        ? edits.some(edit => edit.page !== selected.page || edit.id !== selected.id) || inlineText.value !== selected.text || selected.offset.some(v => v !== 0) || Object.keys(selected.format).length > 0
         : edits.length > 0;
     $("download").disabled = !loaded || busy || !hasEdits;
 }
 async function operation(action, keepInline = false) {
     if (busy) return false;
+    if (selected && !keepInline && !formatValid()) return false;
     const restoreFocus = document.activeElement === inlineText;
     busy = true; controls();
     try {
@@ -81,32 +90,57 @@ async function operation(action, keepInline = false) {
     }
 }
 function options() { return { mode: "line", fit: $("fit").checked, cover: $("cover").checked }; }
+function inlineChanged() {
+    return selected && (inlineText.value !== initialInlineValue || selected.offset.some((v, i) => v !== initialInlineOffset[i]) || JSON.stringify(selected.format) !== initialInlineFormat);
+}
+function formatValid() {
+    return [...formatPanel.querySelectorAll("input[type=number]")].every(input => input.reportValidity());
+}
+const colorHex = color => "#" + color.map(v => Math.max(0, Math.min(255, Math.round(v * 255))).toString(16).padStart(2, "0")).join("");
+function sourceFormat() {
+    return { font: "original", size: selected.size, bold: selected.bold, italic: selected.italic,
+        underline: false, strike: false, color: colorHex(selected.color), align: "left", letterSpacing: 0, lineSpacing: 1 };
+}
+function syncFormatControls() {
+    if (!selected) return;
+    const format = { ...sourceFormat(), ...selected.format };
+    for (const [id, key] of [["text-font", "font"], ["text-size", "size"], ["text-color", "color"],
+        ["text-letter-spacing", "letterSpacing"], ["text-line-spacing", "lineSpacing"]])
+        $(id).value = key === "size" ? Math.round(format[key] * 100) / 100 : format[key];
+    for (const key of ["bold", "italic", "underline", "strike"]) $("text-" + key).setAttribute("aria-pressed", String(format[key]));
+    $("text-bold-italic").setAttribute("aria-pressed", String(format.bold && format.italic));
+    for (const button of $("text-align").querySelectorAll("button")) button.setAttribute("aria-pressed", String(format.align === button.dataset.textAlign));
+}
+function updateFormat(key, value) {
+    if (!selected || busy) return;
+    const format = { ...selected.format };
+    // Explicit sizes also override auto-shrink at the source size. Color and
+    // bold/italic choices must apply uniformly even to originally mixed styles.
+    for (const [property, next] of Object.entries(typeof key === "string" ? { [key]: value } : key)) {
+        if (!["size", "color", "bold", "italic"].includes(property) && next === sourceFormat()[property]) delete format[property];
+        else format[property] = next;
+    }
+    selected.format = normalizeFormat(format);
+    if (key === "font") syncFormatControls();
+    inlineEditor.dataset.error = "false"; controls(); scheduleDraft();
+}
 
 function positionInlineEditor() {
     if (!selected) return;
     const layout = selected.layout;
-    const left = Math.min(selected.origin[0], layout.bounds[0]);
+    const left = Math.min(selected.origin[0] + selected.offset[0], layout.bounds[0]);
     const top = Math.min(...layout.stops.map(stop => stop.top), layout.bounds[1]);
-    const right = Math.max(selected.bbox[2], layout.bounds[2], ...layout.stops.map(stop => stop.x));
+    const right = Math.max(selected.bbox[2] + selected.offset[0], layout.bounds[2], ...layout.stops.map(stop => stop.x));
     const bottom = Math.max(layout.bounds[3], ...layout.stops.map(stop => stop.bottom));
     inlineEditor.style.left = `${(left - bounds[0]) * cssScale}px`;
     inlineEditor.style.top = `${(top - bounds[1]) * cssScale}px`;
     inlineEditor.style.width = `${Math.max(10, right - left) * cssScale}px`;
     inlineText.style.height = `${Math.max(layout.pitch, bottom - top) * cssScale}px`;
+    $("inline-move").style.height = `${inlineText.offsetHeight + 10}px`;
     // The transparent textarea supplies native keyboard, clipboard and IME
     // input. Visible glyphs, selection and caret use PDF font geometry.
-    inlineText.style.fontSize = `${selected.size * cssScale}px`;
+    inlineText.style.fontSize = `${(selected.format.size ?? selected.size) * cssScale}px`;
     inlineText.style.lineHeight = `${layout.pitch * cssScale}px`;
-    const actions = inlineEditor.querySelector(".text-editor-inline-actions");
-    const x = parseFloat(inlineEditor.style.left);
-    actions.style.left = `${Math.max(-x, Math.min(0, $("paper").offsetWidth - x - actions.offsetWidth - 4))}px`;
-    const edge = parseFloat(inlineEditor.style.top) + inlineText.offsetHeight;
-    const textBelow = units.some(unit => unit.id !== selected.id && unit.rects.some(rect => {
-        const y = (rect[1] - bounds[1]) * cssScale;
-        return y >= edge - 2 && y < edge + 48 &&
-            (rect[0] - bounds[0]) * cssScale < x + actions.offsetWidth && (rect[2] - bounds[0]) * cssScale > x;
-    }));
-    inlineEditor.dataset.actionsAbove = String(parseFloat(inlineEditor.style.top) > 48 && (textBelow || edge + 48 > $("paper").offsetHeight));
     paintCaret();
 }
 function caretStops() {
@@ -154,8 +188,10 @@ function placeCaret(point) {
     inlineText.setSelectionRange(offset, offset); paintCaret();
 }
 function scheduleDraft() {
-    renderVersion++; clearTimeout(draftTimer);
+    renderVersion++;
+    if (draftTimer) return;
     draftTimer = setTimeout(async () => {
+        draftTimer = undefined;
         if (!selected || busy) return;
         if (draftRunning) { draftAgain = true; return; }
         draftRunning = true;
@@ -172,9 +208,13 @@ async function selectUnit(unit, point) {
     if (busy) return;
     if (selected?.id === unit.id) { inlineText.focus({ preventScroll: true }); return; }
     const success = await operation(async () => {
-        selected = { ...unit, page };
-        initialInlineValue = edits.find(e => e.page === page && e.id === unit.id)?.value ?? unit.text;
+        const existing = edits.find(e => e.page === page && e.id === unit.id);
+        initialInlineOffset = [...(existing?.offset || [0, 0])];
+        selected = { ...unit, page, offset: [...initialInlineOffset], format: normalizeFormat(existing?.format) };
+        initialInlineFormat = JSON.stringify(selected.format);
+        initialInlineValue = existing?.value ?? unit.text;
         inlineText.value = initialInlineValue;
+        syncFormatControls();
         inlineEditor.hidden = false; inlineEditor.dataset.error = "false";
         positionInlineEditor();
         await render();
@@ -184,7 +224,7 @@ async function selectUnit(unit, point) {
 
 async function render(nextEdits = edits, nextPage = page, includeDraft = true) {
     const version = ++renderVersion;
-    const active = includeDraft && selected?.page === nextPage ? { id: selected.id, value: inlineText.value } : undefined;
+    const active = includeDraft && selected?.page === nextPage ? { id: selected.id, value: inlineText.value, offset: [...selected.offset], format: selected.format } : undefined;
     const zoom = $("zoom").value;
     const cssWidth = zoom === "fit" ? Math.max(240, $("viewport").clientWidth - 48) : (bounds[2] - bounds[0]) * Number(zoom);
     const result = await request("render", { page: nextPage, width: cssWidth * Math.min(devicePixelRatio || 1, 2), edits: nextEdits, options: options(),
@@ -215,7 +255,8 @@ async function render(nextEdits = edits, nextPage = page, includeDraft = true) {
     if (selected) { selected.layout = units.find(unit => unit.id === selected.id).layout; positionInlineEditor(); }
 }
 function clearSelection() {
-    renderVersion++; clearTimeout(draftTimer); caretLayer.replaceChildren();
+    renderVersion++; clearTimeout(draftTimer); draftTimer = undefined; caretLayer.replaceChildren();
+    moveDrag = undefined; delete inlineEditor.dataset.moving;
     selected = undefined; initialInlineValue = ""; inlineText.value = "";
     inlineEditor.hidden = true;
     for (const button of $("boxes").children) button.setAttribute("aria-pressed", "false");
@@ -227,13 +268,16 @@ async function commit(nextEdits) {
 
 async function commitInline() {
     if (!selected) return;
-    if (inlineText.value === initialInlineValue) {
+    if (!inlineChanged()) {
         await render(edits, page, false);
         clearSelection();
         return;
     }
     const next = edits.filter(e => e.page !== selected.page || e.id !== selected.id);
-    if (inlineText.value !== selected.text) next.push({ page: selected.page, id: selected.id, value: inlineText.value });
+    const moved = selected.offset.some(v => v !== 0);
+    const formatted = Object.keys(selected.format).length > 0;
+    if (inlineText.value !== selected.text || moved || formatted) next.push({ page: selected.page, id: selected.id, value: inlineText.value,
+        ...(moved ? { offset: [...selected.offset] } : {}), ...(formatted ? { format: selected.format } : {}) });
     await commit(next);
 }
 
@@ -248,7 +292,7 @@ $("open").addEventListener("click", () => $("file").click());
 const openDialog = $("open-dialog");
 let replacementAction, allowFilePicker = false;
 function hasReplacementEdits() {
-    return loaded && (edits.length > 0 || (selected && inlineText.value !== initialInlineValue));
+    return loaded && (edits.length > 0 || inlineChanged());
 }
 function confirmReplacement(action) {
     if (openDialog.open) return;
@@ -317,10 +361,82 @@ workspace.addEventListener("drop", event => {
 });
 window.addEventListener("dragend", clearFileDrag);
 inlineEditor.addEventListener("submit", event => {
-    event.preventDefault(); if (!selected) return;
+    event.preventDefault(); if (!selected || !formatValid()) return;
     operation(() => commitInline(), true);
 });
-$("inline-cancel").addEventListener("click", cancelInline);
+for (const [id, key] of [["text-font", "font"], ["text-color", "color"]])
+    $(id).addEventListener("input", () => updateFormat(key, $(id).value));
+for (const [id, key] of [["text-size", "size"], ["text-letter-spacing", "letterSpacing"], ["text-line-spacing", "lineSpacing"]]) {
+    $(id).addEventListener("input", () => { if ($(id).validity.valid) updateFormat(key, $(id).valueAsNumber); });
+    $(id).addEventListener("change", () => $(id).reportValidity());
+}
+for (const key of ["bold", "italic", "underline", "strike"]) $("text-" + key).addEventListener("click", () => {
+    updateFormat(key, $("text-" + key).getAttribute("aria-pressed") !== "true"); syncFormatControls();
+});
+$("text-bold-italic").addEventListener("click", () => {
+    const enabled = $("text-bold-italic").getAttribute("aria-pressed") !== "true";
+    updateFormat({ bold: enabled, italic: enabled }); syncFormatControls();
+});
+for (const button of $("text-align").querySelectorAll("button")) button.addEventListener("click", () => {
+    updateFormat("align", button.dataset.textAlign); syncFormatControls();
+});
+$("text-format-reset").addEventListener("click", () => {
+    if (!selected || busy) return;
+    selected.format = {}; syncFormatControls(); inlineEditor.dataset.error = "false"; controls(); scheduleDraft();
+});
+formatPanel.addEventListener("keydown", event => {
+    if (!selected || busy || event.isComposing) return;
+    if (event.key === "Escape") { event.preventDefault(); cancelInline(); }
+    else if (event.key === "Enter" && !event.target.matches("button")) { event.preventDefault(); inlineEditor.requestSubmit(); }
+});
+// The box border moves the string; its interior retains native text editing.
+function moveInline(dx, dy) {
+    if (!selected || busy) return;
+    const layout = selected.layout;
+    const left = Math.min(layout.bounds[0], ...layout.stops.map(s => s.x));
+    const right = Math.max(layout.bounds[2], ...layout.stops.map(s => s.x));
+    const top = Math.min(layout.bounds[1], ...layout.stops.map(s => s.top));
+    const bottom = Math.max(layout.bounds[3], ...layout.stops.map(s => s.bottom));
+    dx = Math.max(bounds[0] - left, Math.min(dx, Math.max(bounds[0] - left, bounds[2] - right)));
+    dy = Math.max(bounds[1] - top, Math.min(dy, Math.max(bounds[1] - top, bounds[3] - bottom)));
+    if (!dx && !dy) return;
+    selected.offset = [selected.offset[0] + dx, selected.offset[1] + dy];
+    selected.layout = { ...layout, bounds: layout.bounds.map((v, i) => v + (i % 2 ? dy : dx)),
+        stops: layout.stops.map(s => ({ ...s, x: s.x + dx, baseline: s.baseline + dy, top: s.top + dy, bottom: s.bottom + dy })) };
+    inlineEditor.dataset.error = "false";
+    positionInlineEditor(); controls(); scheduleDraft();
+}
+const moveHandle = $("inline-move");
+moveHandle.addEventListener("pointerdown", event => {
+    if (!selected || busy || event.button !== 0) return;
+    event.preventDefault(); moveHandle.focus({ preventScroll: true });
+    moveDrag = { pointerId: event.pointerId, x: event.clientX, y: event.clientY, offset: [...selected.offset] };
+    moveHandle.setPointerCapture(event.pointerId); inlineEditor.dataset.moving = "true";
+});
+moveHandle.addEventListener("pointermove", event => {
+    if (moveDrag?.pointerId !== event.pointerId || !selected) return;
+    // Use total displacement so reaching an edge doesn't accumulate hidden movement.
+    moveInline(moveDrag.offset[0] + (event.clientX - moveDrag.x) / cssScale - selected.offset[0],
+        moveDrag.offset[1] + (event.clientY - moveDrag.y) / cssScale - selected.offset[1]);
+});
+function endMove(event) {
+    if (moveDrag?.pointerId !== event.pointerId) return;
+    if (event.type === "pointercancel" && selected)
+        moveInline(moveDrag.offset[0] - selected.offset[0], moveDrag.offset[1] - selected.offset[1]);
+    moveDrag = undefined; delete inlineEditor.dataset.moving;
+    if (moveHandle.hasPointerCapture(event.pointerId)) moveHandle.releasePointerCapture(event.pointerId);
+}
+for (const name of ["pointerup", "pointercancel", "lostpointercapture"]) moveHandle.addEventListener(name, endMove);
+moveHandle.addEventListener("keydown", event => {
+    if (!selected || busy) return;
+    const directions = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
+    if (directions[event.key]) {
+        event.preventDefault(); event.stopPropagation();
+        const step = event.shiftKey ? 10 : 1;
+        moveInline(...directions[event.key].map(v => v * step));
+    } else if (event.key === "Escape") { event.preventDefault(); cancelInline(); }
+    else if (event.key === "Enter") { event.preventDefault(); inlineEditor.requestSubmit(); }
+});
 inlineText.addEventListener("input", () => { inlineEditor.dataset.error = "false"; controls(); scheduleDraft(); });
 inlineText.addEventListener("select", paintCaret);
 inlineText.addEventListener("keyup", paintCaret);
@@ -338,9 +454,9 @@ inlineText.addEventListener("pointerup", event => {
 });
 inlineText.addEventListener("blur", event => {
     const target = event.relatedTarget;
-    if (target && (inlineEditor.contains(target) || target.closest("button,select"))) return;
+    if (target && (inlineEditor.contains(target) || formatPanel.contains(target) || target.closest("button,select"))) return;
     setTimeout(async () => {
-        if (!selected || busy || inlineEditor.contains(document.activeElement)) return;
+        if (!selected || busy || inlineEditor.contains(document.activeElement) || formatPanel.contains(document.activeElement)) return;
         if (await operation(() => {})) target?.focus({ preventScroll: true });
     }, 0);
 });
@@ -352,7 +468,7 @@ inlineText.addEventListener("keydown", event => {
     }
 });
 workspace.addEventListener("pointerdown", event => {
-    if (!selected || busy || inlineEditor.contains(event.target) || event.target.closest(".text-editor-box")) return;
+    if (!selected || busy || inlineEditor.contains(event.target) || formatPanel.contains(event.target) || event.target.closest(".text-editor-box")) return;
     // Tool controls flush the draft in their own operation, so their action also runs.
     if (event.target.closest("button,input,select,textarea,label,summary,a")) return;
     operation(() => {}, false);
@@ -398,7 +514,7 @@ document.addEventListener("keydown", event => {
     if (event.key.toLowerCase() === "z" && !editing) { event.preventDefault(); $("undo").click(); }
 });
 window.addEventListener("beforeunload", event => {
-    if (loaded && (JSON.stringify(edits) !== savedState || (selected && inlineText.value !== initialInlineValue))) { event.preventDefault(); event.returnValue = ""; }
+    if (loaded && (JSON.stringify(edits) !== savedState || inlineChanged())) { event.preventDefault(); event.returnValue = ""; }
 });
 let resizeTimer;
 new ResizeObserver(() => {
